@@ -1,0 +1,260 @@
+#!./venv/bin/python3
+
+import easyocr
+import argparse
+import os
+import cv2
+import pandas
+from colorama import Fore, Style
+import math
+import re
+import datetime
+import platform
+import warnings
+import subprocess
+
+DESCRIPTION = '''\
+-----------------------------------------------------------------------------------------------------------
+Description:
+  A lightweight ORC (Object-Relational Capture) slip processing tool for scanning and extracting data 
+  from JPG-format or JPEG-format images located in the provided file(s) or directory path(s).
+  The extracted information  will be automatically converted into a DataFrame and exported as a .csv file
+  by default. Optionally, it can also be saved as .xlsx.
+-----------------------------------------------------------------------------------------------------------'''
+
+EPILOG = '''\
+-----------------------------------------------------------------------------------------------------------
+• If the --append option is used, the --open and --filename options will be ignored.
+• The tool supports only .csv and .xlsx file formats for input and output.
+• Directory traversal is limited to the top level (level 0).
+• When using --filename, the specified file **must not already exist** — the tool will stop if the file exists.
+• If no output file is specified, the default file will be: ./readslip_YYYYMMDD_HHMMSS.csv
+-----------------------------------------------------------------------------------------------------------'''
+
+MONTHS = ('ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.')
+IMG_EXTENTIONS = ('.jpg', '.jpeg')
+FILE_EXTENTIONS = ('.csv', '.xlsm')
+COMPANYS = ('ATR', 'AI', 'SM', 'NA')
+REPLACE_WORDS = {
+    'al ': 'AI ',
+    '3ขs477' : '3ขร477',
+    '7||5v0' : 'TIISVO',
+    'พัสด ' : 'พัสดุ ',
+    '3๗ษ9296' : '3ฒษ9296',
+    'พัสดฺ' : 'พัสดุ',
+    ' /|' : ' IV',
+    ' (5' : ' CS',
+    ' /n/|' : ' INV',
+    ' t01 ' : ' TOT ',
+    'เครื่องถื่ม' : 'เครื่องดื่ม',
+    'smp|[' : 'SMPIE',
+    '3๗ผ6819' : '3ฒผ6819',
+    'ประกันรถฺญศ9122' : 'ประกันรถ ญศ9122',
+    '$n1|' : 'SN1I',
+    'ศุาวุฒิ' : 'ศุภวุฒิ',
+    ' ฺ' :  ' ',
+}
+
+def main() -> int:
+    args = _argument_parsing()
+    if not args: return 1
+    items = _list_items(args.paths)
+    try:
+        _system_ignore_wanring()
+        data = [] if not args.open and not args.append else _open_file(args.append if args.append else args.open)
+        if data == None: return 1
+        print(f'{Fore.YELLOW}Loading OCR models...{Style.RESET_ALL}')
+        reader_tha = easyocr.Reader(['en', 'th'])
+        reader_eng = easyocr.Reader(['en'])
+        for item in items:
+            _, extention = os.path.splitext(item)
+            if extention.lower() in IMG_EXTENTIONS:
+                try:
+                    image = _get_image(item)
+                    contents_tha = reader_tha.readtext(image, detail=0, paragraph=True)
+                    contents_eng = reader_eng.readtext(image, detail=0, paragraph=True)
+                    amount, date, time, company, noted = _contents_parsing(contents_tha, contents_eng)
+                    data += [ {'วัน' : date, 'เวลา' : time, 'จำนวน' : amount, 'บริษัท' : company, 'รายการ' : noted} ]
+                    print(f'{Fore.GREEN}[SUCCESS] {item}{Style.RESET_ALL}')
+                except FileNotFoundError:
+                    print(f'{Fore.RED}[FAIL] {item}{Style.RESET_ALL}')
+                    error(f'File not found :: {item}')
+                except Exception as e:
+                    print(f'{Fore.RED}[FAIL] {item}{Style.RESET_ALL}')
+                    error(f'{e}')
+    except KeyboardInterrupt: return 1
+    return 0 if not len(data) else _export_file(data, args.filename if not args.append else args.append)
+
+def _open_file(filename: str) -> list:
+    try:
+        _, extention = os.path.splitext(filename)
+        with open(filename, 'r') as file:
+            if extention in FILE_EXTENTIONS:
+                data = pandas.read_csv(file) if extention == '.csv' else pandas.read_excel(file)
+            else:
+                return error(f'Invalid extention to open :: {filename}', color=True)
+    except FileNotFoundError:
+        return error(f'File not found :: {filename}', color=True)
+    except Exception as e:
+        return error(f'{e}', color=True)
+    return data.to_dict(orient='records')
+
+def _filename_default() -> str:
+    now = datetime.datetime.now()
+    splited_now = str(now).split(' ')
+    date = splited_now[0].replace('-', '')
+    time = splited_now[1].split('.')[0].replace(':', '')
+    return  f'readslips_{date}_{time}.csv'
+
+def _export_file(data: list, filename: str) -> None:
+    data_frame = pandas.DataFrame(data)
+    sorted_df = data_frame.sort_values(by=['วัน', 'เวลา'])
+    if not filename:
+        filename = _filename_default()
+    root, extention = os.path.splitext(filename)
+    if extention == '.xlsx':
+        sorted_df.to_excel(filename, index=False)
+    elif extention == '.csv' or not extention:
+        sorted_df.to_csv(filename if extention == '.csv' else filename + '.csv', index=False)
+    else:
+        return error(f'{Fore.RED}readslips: ERROR: Invalid extention to export: {filename}{Style.RESET_ALL}', 1, True)
+    print(f'{Fore.GREEN}[EXPORTED] --> {filename}{Style.RESET_ALL}')
+    return 0
+
+def _list_items(paths: list) -> list:
+    def file_extension_add(file) -> bool:
+        _, extention = os.path.splitext(file)
+        if extention.lower() in IMG_EXTENTIONS:
+            items.append(file)
+            return True
+        return False
+    
+    items = []
+    for path in paths:
+        if os.path.isdir(path):
+            for item in os.listdir(path):
+                file_extension_add(os.path.join(path, item))
+        else:
+             if not file_extension_add(path):
+                error(f'Invalid extention of file :: {path}', color=True)
+    return items
+
+def _contents_parsing(contents_tha: list, contents_eng):
+    date_regx = r"(\d{2})\s(" + "|".join(MONTHS) + r")\s(\d{4})\s(\d{2}:\d{2})"
+    if re.search(date_regx, contents_tha[-1]):
+        contents_tha += _split_date_noted(contents_tha.pop())
+    for index, value in enumerate(contents_tha):
+        if re.search("จำนวนเงิน", value):
+            amount_index = index + 1;
+        elif re.search(date_regx, value):
+            date_index = index
+            break
+    amount = _amount_parsing(contents_tha[amount_index])
+    date, time = _date_parsing(contents_tha[date_index])
+    company, noted = _noted_parsing(contents_tha[-1], contents_eng[-1])
+    return amount, date, time, company, noted
+
+def show_image(image) -> None:
+    cv2.imshow('show_images', image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    return None
+
+def _get_image(image_path: str):
+    image = cv2.imread(image_path)
+    height, width, _ = image.shape
+    x_start, y_start, x_end, y_end = 0, math.floor(height * 0.60), width, height - 80
+    cropped_img = image[y_start:y_end, x_start:x_end]
+    gray_img = cv2.cvtColor(cropped_img, cv2.COLOR_BGR2GRAY)
+    return gray_img
+
+def _split_date_noted(content: str) -> list:
+    index = content.index(":");
+    return [ content[:index + 3], content[index + 4:] ]
+
+def _amount_parsing(amount: str) -> str:
+    return amount[:-4].replace('o', '0') if amount.index(' บาท') else amount.replace('o', '0')
+
+def _date_parsing(date: str) -> str:
+    splited = date.split()
+    date = '/'.join([splited[0], f'{MONTHS.index(splited[1]) + 1:02}', splited[2]])
+    time = splited[3]
+    return date, time
+
+def _noted_parsing(noted_tha, noted_eng) -> str:
+    result = ''
+    index = 0
+    for key, value in REPLACE_WORDS.items():
+        noted_tha = noted_tha.replace(key, value)
+    length = len(noted_tha)
+    while index < length:
+        if 'a' <= noted_tha[index] <= 'z':
+            word = ''
+            while index < length and 'a' <= noted_tha[index] <= 'z':
+                word += noted_tha[index]
+                index += 1
+            word_length = len(word)
+            try:
+                start = noted_eng.lower().index(word)
+                result += noted_eng[start:start + word_length]
+                noted_eng = noted_eng[start + word_length:]
+            except:
+                pass
+        else:
+            result += noted_tha[index]
+            index +=  1;
+    splited_result = result.split()
+    if splited_result[0] in COMPANYS:
+        return splited_result[0], ' '.join(splited_result[1:])
+    return '', result
+
+def _system_ignore_wanring() -> None:
+    if platform.system() == "Darwin":
+        try:
+            chip_info = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"]).decode()
+            if "Apple" in chip_info:
+                warnings.filterwarnings("ignore", message=".*pin_memory.*")
+        except Exception:
+            pass
+    return None
+
+def _argument_parsing() -> argparse.ArgumentParser | None:
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, add_help=False,
+                                    prog="readslips", description=DESCRIPTION, epilog=EPILOG,)
+    parser.add_argument("paths",
+                        type=str,
+                        metavar="PATHS",
+                        nargs='*',
+                        help="One or more file paths or directories containing slip images.")
+    parser.add_argument("-h", "--help",
+                        action="help",
+                        help="Show this help message and exit.")
+    parser.add_argument("-v", "--version",
+                        action="version",
+                        version="%(prog)s 1.0.0 beta",
+                        help="Show the current version of the program and exit.\n ")
+    parser.add_argument("-f", "--filename",
+                        type=str,
+                        metavar="FILE_NAME",
+                        help="Specify the name of the output file to export results.\n ")
+    parser.add_argument("-o", "--open", 
+                        type=str,
+                        metavar="FILE_NAME",
+                        help="Specify a file to open and load existing data.\n ")
+    parser.add_argument("-a", "--append",
+                        type=str,
+                        metavar="FILE_NAME",
+                        help="Append new data to an existing file. When this option is used,both --open and --filename will be ignored.")
+    args = parser.parse_args()
+    if not args.append and args.filename and os.path.isfile(args.filename):
+        return error(f'Duplicate file name to export :: {args.filename}', None, True)
+    if not args.paths:
+        return error(f'The following arguments are required: PATHS', None, True)
+    return args
+
+def error(message: str, code: int=None, color: bool=False) -> int | None:
+    print(f"{Fore.RED if color else Style.RESET_ALL}readslip: ERROR: {message}{Style.RESET_ALL}")
+    return code
+
+if __name__ == "__main__":
+    main()
