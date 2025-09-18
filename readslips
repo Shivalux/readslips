@@ -12,6 +12,7 @@ import datetime
 import platform
 import warnings
 import subprocess
+import pprint
 
 DESCRIPTION = '''\
 -----------------------------------------------------------------------------------------------------------
@@ -52,6 +53,7 @@ REPLACE_WORDS = {
     'ประกันรถฺญศ9122' : 'ประกันรถ ญศ9122',
     '$n1|' : 'SN1I',
     'ศุาวุฒิ' : 'ศุภวุฒิ',
+    'ทางถ่วน' : 'ทางด่วน',
     ' ฺ' :  ' ',
 }
 
@@ -74,7 +76,7 @@ def main() -> int:
                     contents_tha = reader_tha.readtext(image, detail=0, paragraph=True)
                     contents_eng = reader_eng.readtext(image, detail=0, paragraph=True)
                     amount, date, time, company, noted = _contents_parsing(contents_tha, contents_eng)
-                    data += [ {'วัน' : date, 'เวลา' : time, 'จำนวน' : amount, 'บริษัท' : company, 'รายการ' : noted} ]
+                    data += [ {'วัน' : date, 'เวลา' : time, 'จำนวน' : amount, 'บริษัท' : company, 'รายการ' : noted, 'ชื่อไฟล์' : item} ]
                     print(f'{Fore.GREEN}[SUCCESS] {item}{Style.RESET_ALL}')
                 except FileNotFoundError:
                     print(f'{Fore.RED}[FAIL] {item}{Style.RESET_ALL}')
@@ -151,7 +153,7 @@ def _contents_parsing(contents_tha: list, contents_eng):
             break
     amount = _amount_parsing(contents_tha[amount_index])
     date, time = _date_parsing(contents_tha[date_index])
-    company, noted = _noted_parsing(contents_tha[-1], contents_eng[-1])
+    company, noted = _noted_parsing(' '.join(contents_tha[-2:]) if len(contents_tha[-2]) < 4 else contents_tha[-1], contents_eng[-1])
     return amount, date, time, company, noted
 
 def show_image(image) -> None:
@@ -186,6 +188,7 @@ def _noted_parsing(noted_tha, noted_eng) -> str:
     index = 0
     for key, value in REPLACE_WORDS.items():
         noted_tha = noted_tha.replace(key, value)
+    print(noted_tha)
     length = len(noted_tha)
     while index < length:
         if 'a' <= noted_tha[index] <= 'z':
