@@ -12,7 +12,6 @@ import datetime
 import platform
 import warnings
 import subprocess
-import pprint
 
 DESCRIPTION = '''\
 -----------------------------------------------------------------------------------------------------------
@@ -188,7 +187,6 @@ def _noted_parsing(noted_tha, noted_eng) -> str:
     index = 0
     for key, value in REPLACE_WORDS.items():
         noted_tha = noted_tha.replace(key, value)
-    print(noted_tha)
     length = len(noted_tha)
     while index < length:
         if 'a' <= noted_tha[index] <= 'z':
