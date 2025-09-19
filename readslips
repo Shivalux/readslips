@@ -121,7 +121,6 @@ def _filename_default(xlsx) -> str:
     return  f'readslips_{date}_{time}.{"csv" if not xlsx else "xlsx"}'
 
 def _to_excel(filename: str, data: list) -> None:
-    print('heoolo')
     workbook = openpyxl.Workbook()
     worksheet = workbook.active
     worksheet.title = "รายการสลิป"
