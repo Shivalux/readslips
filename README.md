@@ -96,7 +96,7 @@ Option | Description |
 ## Output
 * Default: `.csv` file with structured data extracted from the slips.
 * Optional: `.xlsx` file if --xlsx flag used (and not overridden).
-* Output fields may include: date, time, amount, company, noted, filename(hyperlink)
+* Output fields may include: date, time, amount, company, noted, filename(hyperlink).
 
 ## Example
 ### Command
@@ -106,7 +106,7 @@ $ ./readslips -x -f slips_data .
 ### What happens
 * Processes all `.jpg` / `.jpeg` images inside `current directory`.
 * Recognise text from each image.
-* Exports the extracted data into slips_data.xlsx
+* Exports the extracted data into slips_data.xlsx.
 
 ### result
 ```csv
