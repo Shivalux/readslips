@@ -6,10 +6,10 @@ Lightweight OCR slip processing tool for extracting data from Krungthai slips in
 
 ## 📝 Description
 
-ReadSlip is a Python-based OCR [(Optical Character Recognition)](https://www.ibm.com/think/topics/optical-character-recognition) tool that processes Krungthai bank slip images from JPG-format or JPEG-format images from one or more file(s) or directory(ies). It extracts key data fields, structures them into a table (Pandas DataFrame), and exports to a `.csv` file by default. Optionally, you can export to `.xlsx`
+ReadSlip is a Python-based OCR [(Optical Character Recognition)](https://www.ibm.com/think/topics/optical-character-recognition) tool that processes [Krungthai bank slip images](slip_sample.jpg) from JPG-format or JPEG-format images from one or more file(s) or directory(ies). It extracts key data fields, structures them into a table (Pandas DataFrame), and exports to a `.csv` file by default. Optionally, you can export to `.xlsx`
 
 ### Features
-- Supports [Krungthai slip](slip_sample.jpg) format only (bank slip template/layout)
+- Supports Krungthai slip format only (bank slip template/layout)
 - Processes JPG / JPEG image files
 - Recognizes both **Thai** and **English** text
 - Default export format: `.csv`
