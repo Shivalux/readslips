@@ -57,7 +57,6 @@ import cv2
 ...
 ```
 You can find the correct path via:
-Mac/Linux
 ```bash
 $ which python3    # MacOS/Linux
 $ where python     # Window
@@ -113,9 +112,6 @@ $ ./readslips -x -f slips_data .
 date,time,amount,company,noted,filename
 05/08/2568,15:42,"1,000.00 บาท time 0.0d",AI,EasyPass,"=HYPERLINK(""file:///Users/shivarakii/Documents/payment_orc/slip_sample.jpg"", ""slip_sample.jpg"")"
 ```
-
-
-
 ## 👥 Authors & Acknowledments
 
 Created by @Shivalux
