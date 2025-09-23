@@ -110,7 +110,7 @@ $ ./readslips -x -f slips_data .
 ### result
 ```csv
 date,time,amount,company,noted,filename
-05/08/2568,15:42,"1,000.00 บาท time 0.0d",AI,EasyPass,"=HYPERLINK(""file:///Users/shivarakii/Documents/payment_orc/slip_sample.jpg"", ""slip_sample.jpg"")"
+05/08/2568,15:42,"1,000.00",AI,EasyPass,"=HYPERLINK(""file:///Users/shivarakii/Documents/payment_orc/slip_sample.jpg"", ""slip_sample.jpg"")"
 ```
 ## 👥 Authors & Acknowledments
 
