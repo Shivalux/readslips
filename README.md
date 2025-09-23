@@ -17,7 +17,7 @@ ReadSlip is a Python-based OCR [(Optical Character Recognition)](https://www.ibm
 
 ## 💻 Installation
 
-### Requirment
+### Requirments
 - Python 3.x  
 - `pip`
 
