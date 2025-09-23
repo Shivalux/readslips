@@ -12,13 +12,12 @@ import datetime
 import platform
 import warnings
 import subprocess
-import pprint
 import openpyxl
 
 DESCRIPTION = '''\
 -----------------------------------------------------------------------------------------------------------
 Description:
-  A lightweight ORC (Object-Relational Capture) slip processing tool for scanning and extracting data 
+  A lightweight OCR (Optical Character Recognition) slip processing tool for scanning and extracting data 
   from JPG-format or JPEG-format images located in the provided file(s) or directory path(s).
   The extracted information  will be automatically converted into a DataFrame and exported as a .csv file
   by default. Optionally, it can also be saved as .xlsx.
@@ -33,10 +32,13 @@ EPILOG = '''\
 • If no output file is specified, the default file will be: ./readslip_YYYYMMDD_HHMMSS.csv
 -----------------------------------------------------------------------------------------------------------'''
 
+LANGUAGE = 'THA'
 MONTHS = ('ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.')
 IMG_EXTENTIONS = ('.jpg', '.jpeg')
 FILE_EXTENTIONS = ('.csv', '.xlsx')
 COMPANYS = ('ATR', 'AI', 'SM', 'NA')
+COLUMNS = {'THA':['วัน', 'เวลา', 'จำนวน', 'บริษัท', 'รายการ', 'ชื่อไฟล์'],
+           'ENG':[ 'date', 'time', 'amount', 'company', 'noted', 'filename']}
 REPLACE_WORDS = {
     'al ': 'AI ',
     '3ขs477' : '3ขร477',
@@ -77,7 +79,8 @@ def main() -> int:
                     contents_tha = reader_tha.readtext(image, detail=0, paragraph=True)
                     contents_eng = reader_eng.readtext(image, detail=0, paragraph=True)
                     amount, date, time, company, noted = _contents_parsing(contents_tha, contents_eng)
-                    data += [ {'วัน' : date, 'เวลา' : time, 'จำนวน' : amount, 'บริษัท' : company, 'รายการ' : noted, 'ชื่อไฟล์' : _hyperlink(item, system)} ]
+                    new_data = [date, time,  amount, company, noted, _hyperlink(item, system)]
+                    data += [{key: value for key, value in zip(COLUMNS[LANGUAGE], new_data)}]
                     print(f'{Fore.GREEN}[SUCCESS] {item}{Style.RESET_ALL}')
                 except FileNotFoundError:
                     print(f'{Fore.RED}[FAIL] {item}{Style.RESET_ALL}')
@@ -123,11 +126,13 @@ def _filename_default(xlsx) -> str:
 def _to_excel(filename: str, data: list) -> None:
     workbook = openpyxl.Workbook()
     worksheet = workbook.active
-    worksheet.title = "รายการสลิป"
-    worksheet.append([ 'วัน', 'เวลา', 'จำนวน', 'บริษัท', 'รายการ', 'ชื่อไฟล์' ])
+    worksheet.title = "readslips"
+    worksheet.append([item for item in COLUMNS[LANGUAGE]])
     for row in data:
-        path = row['ชื่อไฟล์'].split('\"')
-        worksheet.append([ row['วัน'], row['เวลา'], row['จำนวน'], row['บริษัท'], row['รายการ'], path[3] ])
+        path = row[COLUMNS[LANGUAGE][5]].split('\"')
+        worksheet.append([ row[COLUMNS[LANGUAGE][0]], row[COLUMNS[LANGUAGE][1]],
+                           row[COLUMNS[LANGUAGE][2]], row[COLUMNS[LANGUAGE][3]],
+                           row[COLUMNS[LANGUAGE][4]], path[3] ])
         cell = worksheet.cell(row=worksheet.max_row, column=6)
         cell.hyperlink = path[1]
         cell.font = openpyxl.styles.Font(color="0000FF", underline="single") 
@@ -136,11 +141,12 @@ def _to_excel(filename: str, data: list) -> None:
 
 def _export_file(data: list, filename: str, xlsx: bool) -> None:
     data_frame = pandas.DataFrame(data)
-    sorted_df = data_frame.sort_values(by=['วัน', 'เวลา'])
+    sorted_df = data_frame.sort_values(by=[COLUMNS[LANGUAGE][0], COLUMNS[LANGUAGE][1]])
     if not filename:
         filename = _filename_default(xlsx)
     root, extention = os.path.splitext(filename)
-    if extention == '.xlsx':
+    if extention == '.xlsx' or (xlsx and not extention):
+        filename = filename if extention else filename + '.xlsx'
         _to_excel(filename, sorted_df.to_dict(orient='records'))
     elif extention == '.csv' or not extention:
         sorted_df.to_csv(filename if extention == '.csv' else filename + '.csv', index=False)

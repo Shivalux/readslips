@@ -1,58 +1,54 @@
 # ReadSlip
 
-ReadSlip is a lightweight ORC (Object-Relational Capture) slip processing tool for scanning and extracting data 
-from JPG-format or JPEG-format images located in the provided file(s) or directory path(s).
-The extracted information  will be automatically converted into a DataFrame and exported as a .csv file
-by default. Optionally, it can also be saved as .xlsx. writing in Python.
+Lightweight OCR slip processing tool for extracting data from Krungthai slips in images and exporting the results to CSV or optionally XLSX.
 
 ---
 
 ## 📝 Description
 
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+ReadSlip is a Python-based OCR [(Optical Character Recognition)](https://www.ibm.com/think/topics/optical-character-recognition) tool that processes Krungthai bank slip images from JPG-format or JPEG-format images from one or more file(s) or directory(ies). It extracts key data fields, structures them into a table (Pandas DataFrame), and exports to a `.csv` file by default. Optionally, you can export to `.xlsx`
 
 ### Features
-
--
--
--
--
+- Supports Krungthai slip format only (bank slip template/layout)
+- Processes JPG / JPEG image files
+- Recognizes both **Thai** and **English** text
+- Default export format: `.csv`
+- Optional export format: `.xlsx`
 
 ## 💻 Installation
 
 ### Requirment
-
-
+- Python 3.x  
+- `pip`
 
 ### Steps
 
-clone the git repo 
+1. Clone the repository:
 ```bash
 $ git clone https://github.com/Shivalux/readslips.git
+$ cd readslips
 ```
 
-(optionnal) create the virturl environment and activate tht virturl environment
-Mac/Linux
+2. (Optional but recommended) Create and activate a virtual environment:
 ```bash
-# Mac/Linux
+# MacOS / Linux
 $ python3 -m venv <virturl_environment_path>
 $ source <virturl_environment_path>/bin/activate
 
 # Window
 $ python -m venv <virturl_environment_path>
-$ python -m venv <virturl_environment_path>\Scripts\activate.bat
+$  .\venv\Scripts\activate
 ```
 
-install requirments.txt
+3. Install dependencies:
 ```bash
 $ pip install -r requirment.tst
 ```
 
-fix the shibang path on the top of readslip file with your your python path check by
+4. Update the shebang (first line) in `readslip` script to point to your Python interpreter path, e.g.:
 
-readslip
 ```py
-#!./venv/bin/python3 <---- change this line with your python interperter path
+#!./venv/bin/python3 <---- update this line.
 
 import easyocr
 import argparse
@@ -60,19 +56,16 @@ import os
 import cv2
 ...
 ```
-check by
+You can find the correct path via:
 Mac/Linux
 ```bash
-# Mac/Linux
-$ where python3
-
-# Window
-$ where python
+$ which python3    # MacOS/Linux
+$ where python     # Window
 ```
 
-Deactivate the vitrual environ ment 
+5. (If you activated virtual environment) deactivate when done:
 ```bash
-deactivate
+$ deactivate
 ```
 ---
 ## 🚀 Usage
@@ -93,17 +86,40 @@ Option | Description |
 `-a FILE_NAME`, `--append FILE_NAME` | Append new data to an existing file |
 
 ### Noted 
-* When the `--filename` option is specified, the `--xlsx` option will be ignored.
-* When `--append` option is used, both `--open` and `--filename` will be ignored.
+* if `--filename` option is given, the `--xlsx` option will be ignored.
+* if `--append` option is used, the option `--open` and `--filename` are ignored to avoid conflicts.
 
 ## Input
+* Images of Krungthai bank slips in `JPG` or `JPEG` format.
+* One or more file paths or directories.
+
 ## Output
+* Default: `.csv` file with structured data extracted from the slips.
+* Optional: `.xlsx` file if --xlsx flag used (and not overridden).
+* Output fields may include: date, time, amount, company, noted, filename(hyperlink)
+
 ## Example
----
+### Command
+```bash
+$ ./readslips -x -f slips_data .
+```
+### What happens
+* Processes all `.jpg` / `.jpeg` images inside `current directory`.
+* Recognise text from each image.
+* Exports the extracted data into slips_data.xlsx
+
+### result
+```csv
+date,time,amount,company,noted,filename
+05/08/2568,15:42,"1,000.00 บาท time 0.0d",AI,EasyPass,"=HYPERLINK(""file:///Users/shivarakii/Documents/payment_orc/slip_sample.jpg"", ""slip_sample.jpg"")"
+```
+
+
+
 ## 👥 Authors & Acknowledments
 
 Created by @Shivalux
----
+
 ## ⚖️License
 This project is licensed under the MIT License.  
 See the [LICENSE](LICENSE) file for more information.
