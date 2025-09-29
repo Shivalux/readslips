@@ -49,7 +49,7 @@ $  .\venv\Scripts\activate
 $ pip3 install -r requirments.txt
 
 # Window
-$ pip install requirments.txt
+$ pip install -r requirments.txt
 ```
 
 4. Update the shebang (first line) in `readslip` script to point to your Python interpreter path, e.g.:
