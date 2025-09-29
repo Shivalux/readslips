@@ -45,7 +45,11 @@ $  .\venv\Scripts\activate
 
 3. Install dependencies:
 ```bash
-$ pip install -r requirment.tst
+# MacOS / Linux
+$ pip3 install -r requirments.txt
+
+# Window
+pip install requirments.txt
 ```
 
 4. Update the shebang (first line) in `readslip` script to point to your Python interpreter path, e.g.:
