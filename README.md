@@ -114,7 +114,7 @@ $ ./readslips -x -f slips_data .
 * Recognise text from each image.
 * Exports the extracted data into slips_data.xlsx.
 
-### result
+### Result
 ```csv
 date,time,amount,company,noted,filename
 05/08/2568,15:42,"1,000.00",AI,EasyPass,"=HYPERLINK(""file:///Users/shivarakii/Documents/payment_orc/slip_sample.jpg"", ""slip_sample.jpg"")"
