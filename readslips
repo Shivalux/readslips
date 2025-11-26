@@ -13,6 +13,7 @@ import platform
 import warnings
 import subprocess
 import openpyxl
+import math
 
 DESCRIPTION = '''\
 -----------------------------------------------------------------------------------------------------------
@@ -34,11 +35,16 @@ EPILOG = '''\
 
 LANGUAGE = 'THA'
 MONTHS = ('ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.')
+REPLACE_MONTHS = {'๓.ค.' : 'ต.ค.',}
 IMG_EXTENTIONS = ('.jpg', '.jpeg')
 FILE_EXTENTIONS = ('.csv', '.xlsx')
+LINE_CLEAN = '\033[2K'
+LINE_BACK = f'\033[{1}F' 
+LINE = f'{Fore.YELLOW}=========================================================={Style.RESET_ALL}'
+CLEAN = f'{LINE_CLEAN}{LINE_BACK}{LINE_CLEAN}{LINE_BACK}{LINE_CLEAN}'
 COMPANYS = ('ATR', 'AI', 'SM', 'NA')
-COLUMNS = {'THA':['วัน', 'เวลา', 'จำนวน', 'บริษัท', 'รายการ', 'ชื่อไฟล์'],
-           'ENG':[ 'date', 'time', 'amount', 'company', 'noted', 'filename']}
+COLUMNS = {'THA':['วัน', 'เวลา', 'จำนวน', 'บริษัท', 'รายการ', 'ชื่อไฟล์', 'sort'],
+           'ENG':[ 'date', 'time', 'amount', 'company', 'noted', 'filename', 'sort']}
 REPLACE_WORDS = {
     'al ': 'AI ',
     '3ขs477' : '3ขร477',
@@ -58,38 +64,59 @@ REPLACE_WORDS = {
     'ศุาวุฒิ' : 'ศุภวุฒิ',
     'ทางถ่วน' : 'ทางด่วน',
     ' ฺ' :  ' ',
+    'BAP|[' : 'BAPIE',
+    'BAP|E' : 'BAPIE',
+    'ยีเอสยัวช่า' : 'ยีเอสยัวซ่า',
+    'นำมัน' : 'น้ำมัน',
+    '๓.ย.' : 'ต.ค.'
 }
 
 def main() -> int:
     args = _argument_parsing()
-    if not args: return 1
-    items = _list_items(args.paths)
+    if not args : return 1
+    items, total_files = _list_items(args.paths)
     try:
         system = _system_ignore_wanring()
         data = [] if not args.open and not args.append else _open_file(args.append if args.append else args.open)
         if data == None: return 1
-        print(f'{Fore.YELLOW}Loading OCR models...{Style.RESET_ALL}')
+        print(f'{Fore.YELLOW}[PROCESS] LOADING OCR MODELS.{Style.RESET_ALL}')
         reader_tha = easyocr.Reader(['en', 'th'])
         reader_eng = easyocr.Reader(['en'])
-        for item in items:
+        fail = 0
+        print(f'{LINE}\n\n')
+        for index ,item in enumerate(items):
+            print(f'{CLEAN}[WAITING] {item}{Style.RESET_ALL}')
+            _update_show_progress(index, total_files, fail)
             _, extention = os.path.splitext(item)
             if extention.lower() in IMG_EXTENTIONS:
                 try:
                     image = _get_image(item)
                     contents_tha = reader_tha.readtext(image, detail=0, paragraph=True)
                     contents_eng = reader_eng.readtext(image, detail=0, paragraph=True)
-                    amount, date, time, company, noted = _contents_parsing(contents_tha, contents_eng)
-                    new_data = [date, time,  amount, company, noted, _hyperlink(item, system)]
+                    amount, date, time, company, noted, sort = _contents_parsing(contents_tha, contents_eng)
+                    new_data = [date, time,  amount, company, noted, _hyperlink(item, system), sort]
                     data += [{key: value for key, value in zip(COLUMNS[LANGUAGE], new_data)}]
-                    print(f'{Fore.GREEN}[SUCCESS] {item}{Style.RESET_ALL}')
+                    print(f'{Fore.GREEN}{CLEAN}{LINE_BACK}{LINE_CLEAN}[SUCCESS] {item}{Style.RESET_ALL}')
                 except FileNotFoundError:
-                    print(f'{Fore.RED}[FAIL] {item}{Style.RESET_ALL}')
+                    print(f'{Fore.RED}{CLEAN}{LINE_BACK}{LINE_CLEAN}[FAILED] {item}{Style.RESET_ALL}')
                     error(f'File not found :: {item}')
+                    fail += 1
                 except Exception as e:
-                    print(f'{Fore.RED}[FAIL] {item}{Style.RESET_ALL}')
+                    print(f'{Fore.RED}{CLEAN}{LINE_BACK}{LINE_CLEAN}[FAILED] {item}{Style.RESET_ALL}')
                     error(f'{e}')
+                    fail += 1
+            _update_show_progress(index + 1, total_files, fail, True)
+        print(f'\n{LINE}')
     except KeyboardInterrupt: return 1
     return 0 if not len(data) else _export_file(data, args.filename if not args.append else args.append, args.xlsx)
+
+def _update_show_progress(current: int, total: int, fail: int, end=False) -> None:
+    percentage = math.ceil((current * 100) / total)
+    blocks = '█' * math.ceil(percentage * 0.4)
+    print(LINE)
+    print(f'{Fore.YELLOW}[PROCESS] [{Style.RESET_ALL}{blocks:<40}{Fore.YELLOW}] {percentage:01}%{Style.RESET_ALL}', flush=True)
+    print(f'{Fore.YELLOW}[PROCESS] {Style.RESET_ALL}[CURRENT: {current}/{total}]  {Fore.GREEN}[SUCCESS: {current - fail}]  {Fore.RED}[FAILED: {fail}] {Style.RESET_ALL}', flush=True, end='')
+    return None
 
 def _hyperlink(file_path: str, system: str) -> str:
     abs_path = os.path.abspath(file_path)
@@ -140,20 +167,28 @@ def _to_excel(filename: str, data: list) -> None:
     return None
 
 def _export_file(data: list, filename: str, xlsx: bool) -> None:
-    data_frame = pandas.DataFrame(data)
-    sorted_df = data_frame.sort_values(by=[COLUMNS[LANGUAGE][0], COLUMNS[LANGUAGE][1]])
-    if not filename:
-        filename = _filename_default(xlsx)
-    root, extention = os.path.splitext(filename)
-    if extention == '.xlsx' or (xlsx and not extention):
-        filename = filename if extention else filename + '.xlsx'
-        _to_excel(filename, sorted_df.to_dict(orient='records'))
-    elif extention == '.csv' or not extention:
-        sorted_df.to_csv(filename if extention == '.csv' else filename + '.csv', index=False)
-    else:
-        return error(f'{Fore.RED}readslips: ERROR: Invalid extention to export: {filename}{Style.RESET_ALL}', 1, True)
-    print(f'{Fore.GREEN}[EXPORTED] --> {filename}{Style.RESET_ALL}')
+    try:
+        data_frame = pandas.DataFrame(data)
+        sorted_df = data_frame.sort_values(by=COLUMNS[LANGUAGE][6]).drop(columns=COLUMNS[LANGUAGE][6]).reset_index(drop=True)
+        if not filename:
+            filename = _filename_default(xlsx)
+        root, extention = os.path.splitext(filename)
+        print(f'{Fore.YELLOW}[PROCESS] EXPORTING FILE.{Style.RESET_ALL}')
+        if extention == '.xlsx' or (xlsx and not extention):
+            filename = filename if extention else filename + '.xlsx'
+            _to_excel(filename, sorted_df.to_dict(orient='records'))
+        elif extention == '.csv' or not extention:
+            _to_csv(sorted_df, filename, extention)
+        print(f'{Fore.YELLOW}[SUCCESS] {Fore.GREEN}COMPLETE {Fore.YELLOW}=SAVED=TO=> {Fore.GREEN}[{Style.RESET_ALL} {filename}{'.csv' if not extention and not xlsx else extention}{Fore.GREEN} ]{Style.RESET_ALL}')
+    except Exception as e:
+        return error(f'{Fore.RED}readslips: ERROR: Cannot save file.: {filename}{'.csv' if not extention else extention}\n{e}{Style.RESET_ALL}', 1, True)
     return 0
+
+def _to_csv(dataframe, filename, extention) -> None:
+    for index, value in enumerate(dataframe['ชื่อไฟล์']):
+        dataframe.loc[index, 'ชื่อไฟล์'] = value.split(',')[-1].strip(',") ')
+    dataframe.to_csv(filename if extention == '.csv' else filename + '.csv', index=False)
+    return None
 
 def _list_items(paths: list) -> list:
     def file_extension_add(file) -> bool:
@@ -171,22 +206,22 @@ def _list_items(paths: list) -> list:
         else:
              if not file_extension_add(path):
                 error(f'Invalid extention of file :: {path}', color=True)
-    return items
+    return items, len(items)
 
 def _contents_parsing(contents_tha: list, contents_eng):
+    contents_tha[-1] = _word_corrected(contents_tha[-1], REPLACE_WORDS)
     date_regx = r"(\d{2})\s(" + "|".join(MONTHS) + r")\s(\d{4})\s(\d{2}:\d{2})"
     if re.search(date_regx, contents_tha[-1]):
         contents_tha += _split_date_noted(contents_tha.pop())
     for index, value in enumerate(contents_tha):
+        value = _word_corrected(value, REPLACE_MONTHS)
         if re.search("จำนวนเงิน", value):
-            amount_index = index + 1;
+            amount = _amount_parsing(contents_tha[index + 1])
         elif re.search(date_regx, value):
-            date_index = index
+            date, time, sort = _date_parsing(value)
             break
-    amount = _amount_parsing(contents_tha[amount_index])
-    date, time = _date_parsing(contents_tha[date_index])
     company, noted = _noted_parsing(' '.join(contents_tha[-2:]) if len(contents_tha[-2]) < 4 else contents_tha[-1], contents_eng[-1])
-    return amount, date, time, company, noted
+    return amount, date, time, company, noted, sort
 
 def show_image(image) -> None:
     cv2.imshow('show_images', image)
@@ -213,13 +248,12 @@ def _date_parsing(date: str) -> str:
     splited = date.split()
     date = '/'.join([splited[0], f'{MONTHS.index(splited[1]) + 1:02}', splited[2]])
     time = splited[3]
-    return date, time
+    sort = splited[2] + f'{MONTHS.index(splited[1]) + 1:02}' + splited[0] + splited[3]
+    return date, time, sort
 
 def _noted_parsing(noted_tha, noted_eng) -> str:
     result = ''
     index = 0
-    for key, value in REPLACE_WORDS.items():
-        noted_tha = noted_tha.replace(key, value)
     length = len(noted_tha)
     while index < length:
         if 'a' <= noted_tha[index] <= 'z':
@@ -241,6 +275,11 @@ def _noted_parsing(noted_tha, noted_eng) -> str:
     if splited_result[0] in COMPANYS:
         return splited_result[0], ' '.join(splited_result[1:])
     return '', result
+
+def _word_corrected(noted, correct_words):
+    for key, value in correct_words.items():
+        noted = noted.replace(key, value)
+    return noted
 
 def _system_ignore_wanring() -> str:
     system = platform.system()
@@ -287,6 +326,10 @@ def _argument_parsing() -> argparse.ArgumentParser | None:
     args = parser.parse_args()
     if not args.append and args.filename and os.path.isfile(args.filename):
         return error(f'Duplicate file name to export :: {args.filename}', None, True)
+    if args.filename:
+        filename = args.filename.split('.')
+        if len(filename) > 1 and not args.xlsx and not args.filename.split('.')[-1] in FILE_EXTENTIONS:
+            return error(f'Not support save file extenion :: {args.filename}', None, True)
     if not args.paths:
         return error(f'The following arguments are required: PATHS', None, True)
     return args

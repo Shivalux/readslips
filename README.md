@@ -35,8 +35,8 @@ $ cd readslips
 2. (Optional but recommended) Create and activate a virtual environment:
 ```bash
 # MacOS / Linux
-$ python3 -m venv <virturl_environment_path>
-$ source <virturl_environment_path>/bin/activate
+$ python3 -m venv <virturl_environment_name>
+$ source <virturl_environment_name>/bin/activate
 
 # Window
 $ python -m venv <virturl_environment_path>
