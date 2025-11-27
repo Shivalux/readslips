@@ -35,12 +35,18 @@ EPILOG = '''\
 
 LANGUAGE = 'THA'
 MONTHS = ('ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.')
-REPLACE_MONTHS = {'๓.ค.' : 'ต.ค.',}
+REPLACE_MONTHS = {
+    '๓.ค.' : 'ต.ค.',
+    'w.ย.' : 'พ.ย.',
+    'w.ค.' : 'พ.ค.',
+    'ก.w.' : 'ก.พ.',
+}
 IMG_EXTENTIONS = ('.jpg', '.jpeg')
 FILE_EXTENTIONS = ('.csv', '.xlsx')
 LINE_CLEAN = '\033[2K'
 LINE_BACK = f'\033[{1}F' 
-LINE = f'{Fore.YELLOW}=========================================================={Style.RESET_ALL}'
+LINE = f'{Fore.YELLOW}=========================================================={Style.RESET_ALL}' # 58
+LOGO = f'{LINE}\n{Fore.YELLOW}║= {Fore.WHITE}{'READSLIP':^52} {Fore.YELLOW}=║\n{LINE}'
 CLEAN = f'{LINE_CLEAN}{LINE_BACK}{LINE_CLEAN}{LINE_BACK}{LINE_CLEAN}'
 COMPANYS = ('ATR', 'AI', 'SM', 'NA')
 COLUMNS = {'THA':['วัน', 'เวลา', 'จำนวน', 'บริษัท', 'รายการ', 'ชื่อไฟล์', 'sort'],
@@ -72,6 +78,7 @@ REPLACE_WORDS = {
 }
 
 def main() -> int:
+    print(LOGO)
     args = _argument_parsing()
     if not args : return 1
     items, total_files = _list_items(args.paths)
