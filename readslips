@@ -38,11 +38,14 @@ MONTHS = ('ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'ม
 REPLACE_MONTHS = {
     '๓.ค.' : 'ต.ค.',
     'w.ย.' : 'พ.ย.',
+    'W.ย.' : 'พ.ย.',
     'w.ค.' : 'พ.ค.',
     'ก.w.' : 'ก.พ.',
 }
+FILE_PATH = True
+FILE_NAME = False
 IMG_EXTENTIONS = ('.jpg', '.jpeg')
-FILE_EXTENTIONS = ('.csv', '.xlsx')
+FILE_EXTENTIONS = ('.csv', '.xlsx', '')
 LINE_CLEAN = '\033[2K'
 LINE_BACK = f'\033[{1}F' 
 LINE = f'{Fore.YELLOW}=========================================================={Style.RESET_ALL}' # 58
@@ -55,6 +58,8 @@ REPLACE_WORDS = {
     'al ': 'AI ',
     '3ขs477' : '3ขร477',
     '7||5v0' : 'TIISVO',
+    '1||5v0' : 'TIISVO',
+    't||5v0' : 'TIISVO',
     'พัสด ' : 'พัสดุ ',
     '3๗ษ9296' : '3ฒษ9296',
     'พัสดฺ' : 'พัสดุ',
@@ -70,13 +75,24 @@ REPLACE_WORDS = {
     'ศุาวุฒิ' : 'ศุภวุฒิ',
     'ทางถ่วน' : 'ทางด่วน',
     ' ฺ' :  ' ',
-    'BAP|[' : 'BAPIE',
-    'BAP|E' : 'BAPIE',
+    'bap|[' : 'BAPIE',
+    'bap|e' : 'BAPIE',
     'ยีเอสยัวช่า' : 'ยีเอสยัวซ่า',
     'นำมัน' : 'น้ำมัน',
-    '๓.ย.' : 'ต.ค.'
+    ' ||' : ' IV',
+    ' 0vv5' : ' OVVS',
+    ' [' : ' C',
+    'ft| ' : 'FTI ',
+    'mr.di/ ' : 'MR.DIY ',
+    ' hs' : " HS",
+    ' smp|e' : ' SMPIE',
+    '0s ' : 'CJS ',
+    'mr.d| ' : 'Mr.DIY ',
+    ' ec(/' : ' ECC/',
+    'เอีคอร์ป' : 'อีคอร์ป',
+    '2ashopping' : '24Shopping',
+    **REPLACE_MONTHS,
 }
-
 def main() -> int:
     print(LOGO)
     args = _argument_parsing()
@@ -179,21 +195,26 @@ def _export_file(data: list, filename: str, xlsx: bool) -> None:
         sorted_df = data_frame.sort_values(by=COLUMNS[LANGUAGE][6]).drop(columns=COLUMNS[LANGUAGE][6]).reset_index(drop=True)
         if not filename:
             filename = _filename_default(xlsx)
-        root, extention = os.path.splitext(filename)
+        name, extention = os.path.splitext(filename)
         print(f'{Fore.YELLOW}[PROCESS] EXPORTING FILE.{Style.RESET_ALL}')
         if extention == '.xlsx' or (xlsx and not extention):
             filename = filename if extention else filename + '.xlsx'
             _to_excel(filename, sorted_df.to_dict(orient='records'))
+            extention = '.xlsx'
         elif extention == '.csv' or not extention:
-            _to_csv(sorted_df, filename, extention)
-        print(f'{Fore.YELLOW}[SUCCESS] {Fore.GREEN}COMPLETE {Fore.YELLOW}=SAVED=TO=> {Fore.GREEN}[{Style.RESET_ALL} {filename}{'.csv' if not extention and not xlsx else extention}{Fore.GREEN} ]{Style.RESET_ALL}')
+            _to_csv(sorted_df, filename, extention, FILE_PATH)
+            extention = '.csv'
+        print(f'{Fore.YELLOW}[SUCCESS] {Fore.GREEN}COMPLETE {Fore.YELLOW}=SAVED=TO=> {Fore.GREEN}[{Style.RESET_ALL} {name}{'.csv' if not extention and not xlsx else extention}{Fore.GREEN} ]{Style.RESET_ALL}')
     except Exception as e:
         return error(f'{Fore.RED}readslips: ERROR: Cannot save file.: {filename}{'.csv' if not extention else extention}\n{e}{Style.RESET_ALL}', 1, True)
     return 0
 
-def _to_csv(dataframe, filename, extention) -> None:
+def _to_csv(dataframe, filename, extention, mode=True) -> None:
     for index, value in enumerate(dataframe['ชื่อไฟล์']):
-        dataframe.loc[index, 'ชื่อไฟล์'] = value.split(',')[-1].strip(',") ')
+        if mode:
+            dataframe.loc[index, 'ชื่อไฟล์'] = value.split('\"')[1]
+        else:
+            dataframe.loc[index, 'ชื่อไฟล์'] = value.split(',')[-1].strip(',") ')
     dataframe.to_csv(filename if extention == '.csv' else filename + '.csv', index=False)
     return None
 
@@ -227,7 +248,8 @@ def _contents_parsing(contents_tha: list, contents_eng):
         elif re.search(date_regx, value):
             date, time, sort = _date_parsing(value)
             break
-    company, noted = _noted_parsing(' '.join(contents_tha[-2:]) if len(contents_tha[-2]) < 4 else contents_tha[-1], contents_eng[-1])
+    company, noted = _noted_parsing(' '.join(contents_tha[-2:]) if contents_tha[-2].upper() in COMPANYS else contents_tha[-1],
+                                    ' '.join(contents_eng[-2:]) if contents_eng[-2].upper() in COMPANYS else contents_eng[-1])
     return amount, date, time, company, noted, sort
 
 def show_image(image) -> None:
@@ -331,11 +353,12 @@ def _argument_parsing() -> argparse.ArgumentParser | None:
                         metavar="FILE_NAME",
                         help="Append new data to an existing file. When this option is used, both --open and --filename will be ignored.")
     args = parser.parse_args()
+    #TODO check this with no extentsion input
     if not args.append and args.filename and os.path.isfile(args.filename):
         return error(f'Duplicate file name to export :: {args.filename}', None, True)
     if args.filename:
-        filename = args.filename.split('.')
-        if len(filename) > 1 and not args.xlsx and not args.filename.split('.')[-1] in FILE_EXTENTIONS:
+        filename, extention = os.path.splitext(args.filename)
+        if extention and not extention in FILE_EXTENTIONS:
             return error(f'Not support save file extenion :: {args.filename}', None, True)
     if not args.paths:
         return error(f'The following arguments are required: PATHS', None, True)
